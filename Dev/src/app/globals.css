@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --magenta: #c2185b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-magenta: var(--magenta);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-science-gothic);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Glitch effect for the home logo: mostly still, with a brief burst
+   every few seconds where the logo kicks and leaves a blurred magenta
+   afterimage trailing behind it — like slow-response LCD ghosting. */
+.glitch-logo {
+  isolation: isolate;
+}
+
+/* Trailing echoes of the logo: offset, tinted magenta, blurred and
+   faded out over time so they read as a lingering afterimage.
+   The color layer is screened with the logo first (white background
+   stays pure white, black ink becomes --trail-color exactly), then
+   that result is multiplied onto the base logo — so only the ink
+   trails in color and the white background never tints the page. */
+.glitch-logo::before,
+.glitch-logo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background-image: linear-gradient(var(--trail-color), var(--trail-color)),
+    url("/images/logo-magenta.jpg");
+  background-size: 100% 100%, contain;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-blend-mode: screen;
+  mix-blend-mode: multiply;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.glitch-logo::before {
+  --trail-color: #ff2f96;
+  animation: glitch-trail-a 6s infinite;
+}
+
+.glitch-logo::after {
+  --trail-color: #7a1145;
+  animation: glitch-trail-b 6s infinite;
+}
+
+.glitch-logo__img {
+  animation: glitch-jitter 6s infinite;
+}
+
+@keyframes glitch-jitter {
+  0%,
+  94%,
+  100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  94.3% {
+    transform: translate(-3px, 1px);
+    filter: contrast(1.2) saturate(1.4);
+  }
+  94.6% {
+    transform: translate(3px, -1px);
+    filter: contrast(1.15) saturate(1.3);
+  }
+  95% {
+    transform: translate(-1px, 0);
+    filter: saturate(1.15);
+  }
+  95.6%,
+  100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+}
+
+@keyframes glitch-trail-a {
+  0%,
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+  94.3% {
+    opacity: 0.8;
+    transform: translateY(-3px);
+    filter: blur(0.5px);
+  }
+  95.2% {
+    opacity: 0.5;
+    transform: translateY(-13px);
+    filter: blur(2.5px);
+  }
+  96.2% {
+    opacity: 0.28;
+    transform: translateY(-23px);
+    filter: blur(4.5px);
+  }
+  97.6% {
+    opacity: 0;
+    transform: translateY(-33px);
+    filter: blur(7px);
+  }
+}
+
+@keyframes glitch-trail-b {
+  0%,
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+  94.6% {
+    opacity: 0.55;
+    transform: translateY(-3px);
+    filter: blur(0.5px);
+  }
+  95.6% {
+    opacity: 0.38;
+    transform: translateY(-11px);
+    filter: blur(3px);
+  }
+  96.6% {
+    opacity: 0.2;
+    transform: translateY(-19px);
+    filter: blur(5px);
+  }
+  98% {
+    opacity: 0;
+    transform: translateY(-28px);
+    filter: blur(7.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch-logo::before,
+  .glitch-logo::after,
+  .glitch-logo__img {
+    animation: none;
+  }
+}
