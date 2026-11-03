@@ -5,12 +5,27 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { useContent } from "@/context/ContentContext";
 
+function Tarjeta({ href, titulo, detalle }: { href: string; titulo: string; detalle: string }) {
+  return (
+    <Link
+      href={href}
+      className="block border border-black/10 p-6 transition-colors hover:border-[#c2185b]"
+    >
+      <h2 className="text-lg text-neutral-900">{titulo}</h2>
+      <p className="mt-1 text-sm text-neutral-500">{detalle}</p>
+    </Link>
+  );
+}
+
 function AdminHome() {
-  const { exposiciones, tienda, cargarContenidoDeEjemplo, error } = useContent();
+  const { artistas, exposiciones, tienda, cargarContenidoDeEjemplo, error } = useContent();
   const [cargando, setCargando] = useState(false);
 
+  const borradores = exposiciones.filter((e) => !e.publicado).length;
+  const ocultos = tienda.filter((t) => !t.visible).length;
+
   async function handleCargarEjemplo() {
-    if (!window.confirm("¿Reemplazar TODO el contenido por el de ejemplo? Se borrarán las exposiciones, productos y fotos actuales.")) return;
+    if (!window.confirm("¿Reemplazar TODO el contenido por el de ejemplo? Se borrarán los artistas, exposiciones, productos y fotos actuales.")) return;
     setCargando(true);
     try {
       await cargarContenidoDeEjemplo();
@@ -27,30 +42,27 @@ function AdminHome() {
         Panel de administración
       </h1>
       <p className="mt-2 text-neutral-500">
-        Edita el contenido de Magenta desde aquí.
+        Carga y edita el contenido de Magenta desde aquí.
       </p>
 
       {error && <p className="mt-4 text-sm text-[#c2185b]">{error}</p>}
 
-      <div className="mt-10 grid gap-6 sm:grid-cols-2">
-        <Link
+      <div className="mt-10 grid gap-6 sm:grid-cols-3">
+        <Tarjeta
           href="/admin/exposiciones"
-          className="block border border-black/10 p-6 transition-colors hover:border-[#c2185b]"
-        >
-          <h2 className="text-lg text-neutral-900">Exposiciones</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            {exposiciones.length} exposiciones publicadas
-          </p>
-        </Link>
-        <Link
+          titulo="Exposiciones"
+          detalle={`${exposiciones.length} en total${borradores ? ` · ${borradores} en borrador` : ""}`}
+        />
+        <Tarjeta
           href="/admin/tienda"
-          className="block border border-black/10 p-6 transition-colors hover:border-[#c2185b]"
-        >
-          <h2 className="text-lg text-neutral-900">Tienda</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            {tienda.length} productos publicados
-          </p>
-        </Link>
+          titulo="Tienda"
+          detalle={`${tienda.length} productos${ocultos ? ` · ${ocultos} ocultos` : ""}`}
+        />
+        <Tarjeta
+          href="/admin/artistas"
+          titulo="Artistas"
+          detalle={`${artistas.length} en el catálogo`}
+        />
       </div>
 
       <div className="mt-12 border-t border-black/5 pt-6">

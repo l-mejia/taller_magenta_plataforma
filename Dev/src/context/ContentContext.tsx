@@ -9,23 +9,37 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { artistas as artistasSeed, type Artista } from "@/data/artistas";
 import { exposiciones as exposicionesSeed, type Exposicion } from "@/data/exposiciones";
 import { tienda as tiendaSeed, type ItemTienda } from "@/data/tienda";
 import type { MediaItem } from "@/data/media";
 import { formatMonto, parsePrecio } from "@/context/CartContext";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 import { generateId } from "@/lib/id";
 import { borrarMedia } from "@/lib/storage";
 import { requireSupabase, supabase, SUPABASE_NO_CONFIGURADO } from "@/lib/supabase";
 
 // --- Mapeo entre filas de Postgres (snake_case) y los tipos de la app -------
 
+interface ArtistaRow {
+  id: string;
+  nombre: string;
+  region: string;
+  bio: string;
+  instagram: string;
+  foto_url: string | null;
+}
+
 interface ExposicionRow {
   id: string;
   titulo: string;
   descripcion: string;
   parrafo_explicativo: string;
-  bio_artista: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  publicado: boolean;
   media: MediaItem[];
+  exposicion_artistas?: { artista_id: string; orden: number }[];
 }
 
 interface ItemTiendaRow {
@@ -33,6 +47,7 @@ interface ItemTiendaRow {
   categoria: ItemTienda["categoria"];
   tipo: string;
   titulo: string;
+  artista_id: string | null;
   autor: string;
   precio: number | string;
   descripcion: string;
@@ -40,7 +55,30 @@ interface ItemTiendaRow {
   tecnica: string;
   ano: number | null;
   stock: number;
+  visible: boolean;
   media: MediaItem[];
+}
+
+function rowToArtista(row: ArtistaRow): Artista {
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    region: row.region,
+    bio: row.bio,
+    instagram: row.instagram,
+    fotoUrl: row.foto_url,
+  };
+}
+
+function artistaToRow(a: Artista): ArtistaRow {
+  return {
+    id: a.id,
+    nombre: a.nombre,
+    region: a.region,
+    bio: a.bio,
+    instagram: a.instagram.replace(/^@/, ""),
+    foto_url: a.fotoUrl,
+  };
 }
 
 function rowToExposicion(row: ExposicionRow): Exposicion {
@@ -49,18 +87,25 @@ function rowToExposicion(row: ExposicionRow): Exposicion {
     titulo: row.titulo,
     descripcion: row.descripcion,
     parrafoExplicativo: row.parrafo_explicativo,
-    bioArtista: row.bio_artista,
+    fechaInicio: row.fecha_inicio,
+    fechaFin: row.fecha_fin,
+    publicado: row.publicado,
     media: row.media ?? [],
+    artistaIds: [...(row.exposicion_artistas ?? [])]
+      .sort((a, b) => a.orden - b.orden)
+      .map((r) => r.artista_id),
   };
 }
 
-function exposicionToRow(e: Exposicion): ExposicionRow {
+function exposicionToRow(e: Exposicion): Omit<ExposicionRow, "exposicion_artistas"> {
   return {
     id: e.id,
     titulo: e.titulo,
     descripcion: e.descripcion,
     parrafo_explicativo: e.parrafoExplicativo,
-    bio_artista: e.bioArtista,
+    fecha_inicio: e.fechaInicio || null,
+    fecha_fin: e.fechaFin || null,
+    publicado: e.publicado,
     media: e.media,
   };
 }
@@ -71,6 +116,7 @@ function rowToItem(row: ItemTiendaRow): ItemTienda {
     categoria: row.categoria,
     tipo: row.tipo,
     titulo: row.titulo,
+    artistaId: row.artista_id,
     autor: row.autor,
     precio: formatMonto(Number(row.precio)),
     descripcion: row.descripcion,
@@ -78,6 +124,7 @@ function rowToItem(row: ItemTiendaRow): ItemTienda {
     tecnica: row.tecnica,
     ano: row.ano ?? new Date().getFullYear(),
     stock: row.stock,
+    visible: row.visible,
     media: row.media ?? [],
   };
 }
@@ -88,6 +135,7 @@ function itemToRow(i: ItemTienda): ItemTiendaRow {
     categoria: i.categoria,
     tipo: i.tipo,
     titulo: i.titulo,
+    artista_id: i.artistaId,
     autor: i.autor,
     precio: parsePrecio(i.precio),
     descripcion: i.descripcion,
@@ -95,6 +143,7 @@ function itemToRow(i: ItemTienda): ItemTiendaRow {
     tecnica: i.tecnica,
     ano: i.ano,
     stock: i.stock,
+    visible: i.visible,
     media: i.media,
   };
 }
@@ -105,24 +154,39 @@ function mediaQuitada(antes: MediaItem[], despues: MediaItem[]): MediaItem[] {
   return antes.filter((m) => !urls.has(m.url));
 }
 
+function fotoComoMedia(url: string | null): MediaItem[] {
+  return url ? [{ url, tipo: "imagen" }] : [];
+}
+
 function check<T>(res: { data: T; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
   return res.data;
 }
 
+const SELECT_EXPOSICIONES = "*, exposicion_artistas(artista_id, orden)";
+
 // --- Contexto ---------------------------------------------------------------
 
+type DatosExposicion = Omit<Exposicion, "id">;
+type DatosItem = Omit<ItemTienda, "id">;
+type DatosArtista = Omit<Artista, "id">;
+
 interface ContentContextValue {
+  artistas: Artista[];
   exposiciones: Exposicion[];
   tienda: ItemTienda[];
   loading: boolean;
   error: string | null;
   recargar: () => Promise<void>;
-  addExposicion: (data: Omit<Exposicion, "id">) => Promise<Exposicion>;
-  updateExposicion: (id: string, data: Omit<Exposicion, "id">) => Promise<void>;
+  artistaPorId: (id: string | null | undefined) => Artista | undefined;
+  addArtista: (data: DatosArtista) => Promise<Artista>;
+  updateArtista: (id: string, data: DatosArtista) => Promise<void>;
+  deleteArtista: (id: string) => Promise<void>;
+  addExposicion: (data: DatosExposicion) => Promise<Exposicion>;
+  updateExposicion: (id: string, data: DatosExposicion) => Promise<void>;
   deleteExposicion: (id: string) => Promise<void>;
-  addItemTienda: (data: Omit<ItemTienda, "id">) => Promise<ItemTienda>;
-  updateItemTienda: (id: string, data: Omit<ItemTienda, "id">) => Promise<void>;
+  addItemTienda: (data: DatosItem) => Promise<ItemTienda>;
+  updateItemTienda: (id: string, data: DatosItem) => Promise<void>;
   deleteItemTienda: (id: string) => Promise<void>;
   cargarContenidoDeEjemplo: () => Promise<void>;
 }
@@ -130,20 +194,27 @@ interface ContentContextValue {
 const ContentContext = createContext<ContentContextValue | null>(null);
 
 export function ContentProvider({ children }: { children: ReactNode }) {
+  const { isAdmin } = useAdminAuth();
+  const [artistas, setArtistas] = useState<Artista[]>([]);
   const [exposiciones, setExposiciones] = useState<Exposicion[]>([]);
-  const [tienda, setTienda] = useState<ItemTienda[]>([]);
+  const [tiendaRaw, setTiendaRaw] = useState<ItemTienda[]>([]);
   const [loading, setLoading] = useState(supabase !== null);
   const [error, setError] = useState<string | null>(supabase ? null : SUPABASE_NO_CONFIGURADO);
 
   const recargar = useCallback(async () => {
     if (!supabase) return;
     try {
-      const [expos, items] = await Promise.all([
-        supabase.from("exposiciones").select("*").order("created_at", { ascending: false }),
+      const [arts, expos, items] = await Promise.all([
+        supabase.from("artistas").select("*").order("nombre"),
+        supabase
+          .from("exposiciones")
+          .select(SELECT_EXPOSICIONES)
+          .order("created_at", { ascending: false }),
         supabase.from("items_tienda").select("*").order("created_at", { ascending: false }),
       ]);
+      setArtistas((check(arts) ?? []).map((r) => rowToArtista(r as ArtistaRow)));
       setExposiciones((check(expos) ?? []).map((r) => rowToExposicion(r as ExposicionRow)));
-      setTienda((check(items) ?? []).map((r) => rowToItem(r as ItemTiendaRow)));
+      setTiendaRaw((check(items) ?? []).map((r) => rowToItem(r as ItemTiendaRow)));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el contenido.");
@@ -152,35 +223,101 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // se recarga al entrar o salir como admin: el admin también ve borradores y productos ocultos
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde Supabase; los setState ocurren al resolver la promesa
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga desde Supabase; los setState ocurren al resolver la promesa
     void recargar();
-  }, [recargar]);
+  }, [recargar, isAdmin]);
 
-  async function addExposicion(data: Omit<Exposicion, "id">) {
-    const nueva: Exposicion = {
-      ...data,
-      id: generateId(data.titulo, exposiciones.map((e) => e.id)),
-    };
-    const row = check(
-      await requireSupabase().from("exposiciones").insert(exposicionToRow(nueva)).select().single(),
-    );
-    const creada = rowToExposicion(row as ExposicionRow);
-    setExposiciones((prev) => [creada, ...prev]);
-    return creada;
+  const artistasPorId = useMemo(() => new Map(artistas.map((a) => [a.id, a])), [artistas]);
+
+  // el nombre del autor sale del catálogo, así un cambio de nombre se ve en todos sus productos
+  const tienda = useMemo(
+    () =>
+      tiendaRaw.map((i) => {
+        const artista = i.artistaId ? artistasPorId.get(i.artistaId) : undefined;
+        return artista ? { ...i, autor: artista.nombre } : i;
+      }),
+    [tiendaRaw, artistasPorId],
+  );
+
+  function conAutor(data: DatosItem): DatosItem {
+    const artista = data.artistaId ? artistasPorId.get(data.artistaId) : undefined;
+    return { ...data, autor: artista?.nombre ?? data.autor };
   }
 
-  async function updateExposicion(id: string, data: Omit<Exposicion, "id">) {
-    const anterior = exposiciones.find((e) => e.id === id);
+  // --- Artistas ---
+
+  async function addArtista(data: DatosArtista) {
+    const nuevo: Artista = { ...data, id: generateId(data.nombre, artistas.map((a) => a.id)) };
+    const row = check(
+      await requireSupabase().from("artistas").insert(artistaToRow(nuevo)).select().single(),
+    );
+    const creado = rowToArtista(row as ArtistaRow);
+    setArtistas((prev) => [...prev, creado].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    return creado;
+  }
+
+  async function updateArtista(id: string, data: DatosArtista) {
+    const anterior = artistasPorId.get(id);
     const row = check(
       await requireSupabase()
-        .from("exposiciones")
-        .update(exposicionToRow({ ...data, id }))
+        .from("artistas")
+        .update(artistaToRow({ ...data, id }))
         .eq("id", id)
         .select()
         .single(),
     );
-    const actualizada = rowToExposicion(row as ExposicionRow);
+    const actualizado = rowToArtista(row as ArtistaRow);
+    setArtistas((prev) =>
+      prev.map((a) => (a.id === id ? actualizado : a)).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    );
+    if (anterior) await borrarMedia(mediaQuitada(fotoComoMedia(anterior.fotoUrl), fotoComoMedia(data.fotoUrl)));
+  }
+
+  async function deleteArtista(id: string) {
+    const anterior = artistasPorId.get(id);
+    check(await requireSupabase().from("artistas").delete().eq("id", id));
+    setArtistas((prev) => prev.filter((a) => a.id !== id));
+    // la base ya quitó el vínculo en exposiciones (cascade) y en tienda (set null)
+    setExposiciones((prev) =>
+      prev.map((e) => ({ ...e, artistaIds: e.artistaIds.filter((a) => a !== id) })),
+    );
+    setTiendaRaw((prev) => prev.map((i) => (i.artistaId === id ? { ...i, artistaId: null } : i)));
+    if (anterior) await borrarMedia(fotoComoMedia(anterior.fotoUrl));
+  }
+
+  // --- Exposiciones ---
+
+  async function guardarArtistasDeExposicion(exposicionId: string, artistaIds: string[]) {
+    const db = requireSupabase();
+    check(await db.from("exposicion_artistas").delete().eq("exposicion_id", exposicionId));
+    if (artistaIds.length === 0) return;
+    check(
+      await db.from("exposicion_artistas").insert(
+        artistaIds.map((artista_id, orden) => ({ exposicion_id: exposicionId, artista_id, orden })),
+      ),
+    );
+  }
+
+  async function addExposicion(data: DatosExposicion) {
+    const nueva: Exposicion = {
+      ...data,
+      id: generateId(data.titulo, exposiciones.map((e) => e.id)),
+    };
+    check(await requireSupabase().from("exposiciones").insert(exposicionToRow(nueva)));
+    await guardarArtistasDeExposicion(nueva.id, nueva.artistaIds);
+    setExposiciones((prev) => [nueva, ...prev]);
+    return nueva;
+  }
+
+  async function updateExposicion(id: string, data: DatosExposicion) {
+    const anterior = exposiciones.find((e) => e.id === id);
+    const actualizada: Exposicion = { ...data, id };
+    check(
+      await requireSupabase().from("exposiciones").update(exposicionToRow(actualizada)).eq("id", id),
+    );
+    await guardarArtistasDeExposicion(id, data.artistaIds);
     setExposiciones((prev) => prev.map((e) => (e.id === id ? actualizada : e)));
     if (anterior) await borrarMedia(mediaQuitada(anterior.media, data.media));
   }
@@ -192,38 +329,40 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     if (anterior) await borrarMedia(anterior.media);
   }
 
-  async function addItemTienda(data: Omit<ItemTienda, "id">) {
+  // --- Tienda ---
+
+  async function addItemTienda(data: DatosItem) {
     const nuevo: ItemTienda = {
-      ...data,
-      id: generateId(`${data.tipo}-${data.titulo}`, tienda.map((t) => t.id)),
+      ...conAutor(data),
+      id: generateId(`${data.tipo}-${data.titulo}`, tiendaRaw.map((t) => t.id)),
     };
     const row = check(
       await requireSupabase().from("items_tienda").insert(itemToRow(nuevo)).select().single(),
     );
     const creado = rowToItem(row as ItemTiendaRow);
-    setTienda((prev) => [creado, ...prev]);
+    setTiendaRaw((prev) => [creado, ...prev]);
     return creado;
   }
 
-  async function updateItemTienda(id: string, data: Omit<ItemTienda, "id">) {
-    const anterior = tienda.find((t) => t.id === id);
+  async function updateItemTienda(id: string, data: DatosItem) {
+    const anterior = tiendaRaw.find((t) => t.id === id);
     const row = check(
       await requireSupabase()
         .from("items_tienda")
-        .update(itemToRow({ ...data, id }))
+        .update(itemToRow({ ...conAutor(data), id }))
         .eq("id", id)
         .select()
         .single(),
     );
     const actualizado = rowToItem(row as ItemTiendaRow);
-    setTienda((prev) => prev.map((t) => (t.id === id ? actualizado : t)));
+    setTiendaRaw((prev) => prev.map((t) => (t.id === id ? actualizado : t)));
     if (anterior) await borrarMedia(mediaQuitada(anterior.media, data.media));
   }
 
   async function deleteItemTienda(id: string) {
-    const anterior = tienda.find((t) => t.id === id);
+    const anterior = tiendaRaw.find((t) => t.id === id);
     check(await requireSupabase().from("items_tienda").delete().eq("id", id));
-    setTienda((prev) => prev.filter((t) => t.id !== id));
+    setTiendaRaw((prev) => prev.filter((t) => t.id !== id));
     if (anterior) await borrarMedia(anterior.media);
   }
 
@@ -237,19 +376,38 @@ export function ContentProvider({ children }: { children: ReactNode }) {
 
     check(await db.from("exposiciones").delete().neq("id", ""));
     check(await db.from("items_tienda").delete().neq("id", ""));
-    await borrarMedia([...exposiciones, ...tienda].flatMap((x) => x.media));
+    check(await db.from("artistas").delete().neq("id", ""));
+    await borrarMedia([
+      ...exposiciones.flatMap((e) => e.media),
+      ...tiendaRaw.flatMap((i) => i.media),
+      ...artistas.flatMap((a) => fotoComoMedia(a.fotoUrl)),
+    ]);
+
+    check(await db.from("artistas").insert(artistasSeed.map(artistaToRow)));
     check(await db.from("exposiciones").insert(conFecha(exposicionesSeed.map(exposicionToRow))));
+    check(
+      await db.from("exposicion_artistas").insert(
+        exposicionesSeed.flatMap((e) =>
+          e.artistaIds.map((artista_id, orden) => ({ exposicion_id: e.id, artista_id, orden })),
+        ),
+      ),
+    );
     check(await db.from("items_tienda").insert(conFecha(tiendaSeed.map(itemToRow))));
     await recargar();
   }
 
   const value = useMemo<ContentContextValue>(
     () => ({
+      artistas,
       exposiciones,
       tienda,
       loading,
       error,
       recargar,
+      artistaPorId: (id) => (id ? artistasPorId.get(id) : undefined),
+      addArtista,
+      updateArtista,
+      deleteArtista,
       addExposicion,
       updateExposicion,
       deleteExposicion,
@@ -258,8 +416,8 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       deleteItemTienda,
       cargarContenidoDeEjemplo,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- las funciones se redefinen cada render pero solo dependen de exposiciones/tienda, ya listados
-    [exposiciones, tienda, loading, error, recargar],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- las funciones se redefinen cada render pero solo dependen del estado listado
+    [artistas, exposiciones, tienda, tiendaRaw, artistasPorId, loading, error, recargar],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { useContent } from "@/context/ContentContext";
 import { MediaDisplay } from "@/components/MediaDisplay";
+import { rangoFechas } from "@/data/exposiciones";
 
 function ExposicionesAdmin() {
-  const { exposiciones, deleteExposicion, loading } = useContent();
+  const { exposiciones, deleteExposicion, loading, artistaPorId } = useContent();
 
   async function handleDelete(id: string, titulo: string) {
     if (!window.confirm(`¿Eliminar "${titulo}"? Esta acción no se puede deshacer.`)) return;
@@ -45,9 +46,24 @@ function ExposicionesAdmin() {
               alt={expo.titulo}
               className="h-16 w-16 shrink-0 rounded-sm"
             />
-            <div className="flex-1">
-              <p className="text-neutral-900">{expo.titulo}</p>
-              <p className="text-sm text-neutral-500">{expo.descripcion}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-neutral-900">
+                {expo.titulo}
+                {!expo.publicado && (
+                  <span className="ml-2 border border-[#c2185b] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#c2185b]">
+                    Borrador
+                  </span>
+                )}
+              </p>
+              <p className="truncate text-sm text-neutral-500">
+                {[
+                  rangoFechas(expo),
+                  expo.artistaIds.map((id) => artistaPorId(id)?.nombre ?? id).join(", "),
+                  `${expo.media.length} fotos`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
             <Link
               href={`/admin/exposiciones/${expo.id}`}

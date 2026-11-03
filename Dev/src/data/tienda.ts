@@ -1,5 +1,6 @@
 import { slugify } from "@/lib/id";
 import type { MediaItem } from "@/data/media";
+import { artistaIdDe } from "@/data/artistas";
 
 export type CategoriaTienda = "obras" | "utilitario" | "editorial";
 
@@ -15,6 +16,9 @@ export interface ItemTienda {
   tipo: string;
   media: MediaItem[];
   titulo: string;
+  /** Artista del catálogo; null si no está vinculado. */
+  artistaId: string | null;
+  /** Nombre a mostrar: el del artista vinculado o texto libre. */
   autor: string;
   precio: string;
   descripcion: string;
@@ -22,6 +26,8 @@ export interface ItemTienda {
   tecnica: string;
   ano: number;
   stock: number;
+  /** false = oculto en la tienda pública, sin borrarlo. */
+  visible: boolean;
 }
 
 function formatPrecio(monto: number): string {
@@ -89,6 +95,8 @@ const obras: ItemTienda[] = obrasNombres.map((nombre, i) => {
     id: slugify(`${categoria.tipo}-${nombre}-${i}`),
     categoria: "obras",
     autor,
+    artistaId: artistaIdDe(autor),
+    visible: true,
     medidas: categoria.medidas,
     titulo: nombre,
     tecnica: categoria.tecnica,
@@ -157,6 +165,8 @@ const utilitario: ItemTienda[] = utilitarioNombres.map((nombre, i) => {
     id: slugify(`${categoria.tipo}-${nombre}-${i}`),
     categoria: "utilitario",
     autor,
+    artistaId: artistaIdDe(autor),
+    visible: true,
     medidas: categoria.medidas,
     titulo: nombre,
     tecnica: categoria.tecnica,
@@ -212,6 +222,8 @@ const editorial: ItemTienda[] = editorialNombres.map((nombre, i) => {
     id: slugify(`${categoria.tipo}-${nombre}-${i}`),
     categoria: "editorial",
     autor,
+    artistaId: artistaIdDe(autor),
+    visible: true,
     medidas: categoria.medidas,
     titulo: nombre,
     tecnica: categoria.tecnica,

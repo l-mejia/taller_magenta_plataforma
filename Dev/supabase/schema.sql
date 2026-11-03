@@ -37,8 +37,8 @@ create table if not exists public.exposiciones (
   titulo text not null,
   descripcion text not null default '',
   parrafo_explicativo text not null default '',
-  bio_artista text not null default '',
-  -- [{ "url": "...", "tipo": "imagen" | "video" }]; la primera es la portada
+  bio_artista text not null default '', -- obsoleto: reemplazado por el catálogo de artistas
+  -- [{ "url", "tipo": "imagen" | "video", "descripcion"?, "obra"? }]; la primera es la portada (ver Docs/contrato-datos.md)
   media jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -129,6 +129,75 @@ drop policy if exists "media: admins borran" on storage.objects;
 create policy "media: admins borran" on storage.objects
   for delete to authenticated
   using (bucket_id = 'media' and public.is_admin());
+
+-- ===========================================================================
+-- Plataforma de carga (v2): catálogo de artistas, fechas, borradores
+-- ===========================================================================
+
+-- Catálogo de artistas, compartido por exposiciones y tienda
+create table if not exists public.artistas (
+  id text primary key,
+  nombre text not null,
+  region text not null default '',
+  bio text not null default '',
+  instagram text not null default '',
+  foto_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists artistas_updated_at on public.artistas;
+create trigger artistas_updated_at before update on public.artistas
+  for each row execute function public.touch_updated_at();
+
+alter table public.artistas enable row level security;
+
+drop policy if exists "artistas: lectura publica" on public.artistas;
+create policy "artistas: lectura publica" on public.artistas
+  for select to anon, authenticated using (true);
+
+drop policy if exists "artistas: admins escriben" on public.artistas;
+create policy "artistas: admins escriben" on public.artistas
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Exposiciones: fechas y borrador / publicado
+alter table public.exposiciones add column if not exists fecha_inicio date;
+alter table public.exposiciones add column if not exists fecha_fin date;
+alter table public.exposiciones add column if not exists publicado boolean not null default true;
+
+-- Una exposición tiene uno o varios artistas
+create table if not exists public.exposicion_artistas (
+  exposicion_id text not null references public.exposiciones (id) on delete cascade on update cascade,
+  artista_id text not null references public.artistas (id) on delete cascade on update cascade,
+  orden integer not null default 0,
+  primary key (exposicion_id, artista_id)
+);
+
+alter table public.exposicion_artistas enable row level security;
+
+drop policy if exists "exposicion_artistas: lectura publica" on public.exposicion_artistas;
+create policy "exposicion_artistas: lectura publica" on public.exposicion_artistas
+  for select to anon, authenticated using (true);
+
+drop policy if exists "exposicion_artistas: admins escriben" on public.exposicion_artistas;
+create policy "exposicion_artistas: admins escriben" on public.exposicion_artistas
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Tienda: artista del catálogo y visible / oculto
+alter table public.items_tienda
+  add column if not exists artista_id text references public.artistas (id) on delete set null on update cascade;
+alter table public.items_tienda add column if not exists visible boolean not null default true;
+
+-- El público solo ve lo publicado / visible; el admin ve todo (borradores incluidos)
+drop policy if exists "exposiciones: lectura publica" on public.exposiciones;
+create policy "exposiciones: lectura publica" on public.exposiciones
+  for select to anon, authenticated using (publicado or public.is_admin());
+
+drop policy if exists "tienda: lectura publica" on public.items_tienda;
+create policy "tienda: lectura publica" on public.items_tienda
+  for select to anon, authenticated using (visible or public.is_admin());
 
 -- ---------------------------------------------------------------------------
 -- Dar permisos de admin (correr DESPUÉS de crear el usuario en

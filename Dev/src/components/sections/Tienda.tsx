@@ -24,7 +24,7 @@ function ProductCard({ item }: { item: ItemTienda }) {
     <div>
       <MediaCarousel
         items={item.media}
-        alt={item.titulo}
+        alt={item.media[0]?.descripcion || item.titulo}
         className="aspect-square rounded-sm"
       />
       <div className="mt-4">
@@ -61,7 +61,8 @@ function ProductCard({ item }: { item: ItemTienda }) {
 export function Tienda() {
   const { tienda } = useContent();
   const [tab, setTab] = useState<(typeof categoriasTienda)[number]["key"]>("obras");
-  const items = tienda.filter((item) => item.categoria === tab);
+  // el admin también recibe productos ocultos; aquí solo se muestran los visibles
+  const items = tienda.filter((item) => item.visible && item.categoria === tab);
 
   return (
     <main className="mx-auto max-w-6xl px-6 pb-28 pt-32">

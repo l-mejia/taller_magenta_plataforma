@@ -51,9 +51,16 @@ function TiendaAdmin() {
               className="h-16 w-16 shrink-0 rounded-sm"
             />
             <div className="flex-1">
-              <p className="text-neutral-900">{item.titulo}</p>
+              <p className="text-neutral-900">
+                {item.titulo}
+                {!item.visible && (
+                  <span className="ml-2 border border-neutral-400 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+                    Oculto
+                  </span>
+                )}
+              </p>
               <p className="text-sm text-neutral-500">
-                {labelCategoria(item.categoria)} · {item.precio} ·{" "}
+                {item.autor} · {labelCategoria(item.categoria)} · {item.precio} ·{" "}
                 {item.stock <= 0 ? "Agotado" : `${item.stock} disponibles`}
               </p>
             </div>

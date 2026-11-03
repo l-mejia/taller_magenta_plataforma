@@ -19,7 +19,6 @@ function NuevaExposicion() {
 
       <div className="mt-8">
         <ExposicionForm
-          submitLabel="Crear exposición"
           onSubmit={async (data) => {
             await addExposicion(data);
             router.push("/admin/exposiciones");

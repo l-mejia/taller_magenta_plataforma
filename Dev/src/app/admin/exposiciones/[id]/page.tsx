@@ -39,7 +39,6 @@ function EditarExposicion() {
       <div className="mt-8">
         <ExposicionForm
           initial={expo}
-          submitLabel="Guardar cambios"
           onSubmit={async (data) => {
             await updateExposicion(expo.id, data);
             router.push("/admin/exposiciones");
