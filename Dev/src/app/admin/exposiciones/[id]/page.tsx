@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { BotonEliminar } from "@/components/admin/BotonEliminar";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { ExposicionForm } from "@/components/admin/ExposicionForm";
 import { useContent } from "@/context/ContentContext";
 
 function EditarExposicion() {
   const { id } = useParams<{ id: string }>();
-  const { exposiciones, updateExposicion, loading } = useContent();
+  const { exposiciones, updateExposicion, loading, deleteExposicion } = useContent();
   const router = useRouter();
   const expo = exposiciones.find((e) => e.id === id);
 
@@ -45,6 +46,15 @@ function EditarExposicion() {
           }}
         />
       </div>
+
+      <BotonEliminar
+        label="Eliminar exposición"
+        confirmacion={`¿Eliminar "${expo.titulo}"? Esta acción no se puede deshacer. Se borrarán también sus fotos del almacenamiento.`}
+        onEliminar={async () => {
+          await deleteExposicion(expo.id);
+          router.push("/admin/exposiciones");
+        }}
+      />
     </main>
   );
 }

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { BotonEliminar } from "@/components/admin/BotonEliminar";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { ArtistaForm } from "@/components/admin/ArtistaForm";
 import { useContent } from "@/context/ContentContext";
 
 function EditarArtista() {
   const { id } = useParams<{ id: string }>();
-  const { artistaPorId, updateArtista, loading } = useContent();
+  const { artistaPorId, updateArtista, loading, deleteArtista } = useContent();
   const router = useRouter();
   const artista = artistaPorId(id);
 
@@ -46,6 +47,15 @@ function EditarArtista() {
           }}
         />
       </div>
+
+      <BotonEliminar
+        label="Eliminar artista"
+        confirmacion={`¿Eliminar "${artista.nombre}"? Esta acción no se puede deshacer. Se quitará de las exposiciones y productos donde aparece.`}
+        onEliminar={async () => {
+          await deleteArtista(artista.id);
+          router.push("/admin/artistas");
+        }}
+      />
     </main>
   );
 }

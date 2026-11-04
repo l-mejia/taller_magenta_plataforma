@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { BotonEliminar } from "@/components/admin/BotonEliminar";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { ItemTiendaForm } from "@/components/admin/ItemTiendaForm";
 import { useContent } from "@/context/ContentContext";
 
 function EditarItem() {
   const { id } = useParams<{ id: string }>();
-  const { tienda, updateItemTienda, loading } = useContent();
+  const { tienda, updateItemTienda, loading, deleteItemTienda } = useContent();
   const router = useRouter();
   const item = tienda.find((t) => t.id === id);
 
@@ -46,6 +47,15 @@ function EditarItem() {
           }}
         />
       </div>
+
+      <BotonEliminar
+        label="Eliminar producto"
+        confirmacion={`¿Eliminar "${item.titulo}"? Esta acción no se puede deshacer. Se borrarán también sus fotos del almacenamiento.`}
+        onEliminar={async () => {
+          await deleteItemTienda(item.id);
+          router.push("/admin/tienda");
+        }}
+      />
     </main>
   );
 }
