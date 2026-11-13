@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useContent } from "@/context/ContentContext";
 import { MediaDisplay } from "@/components/MediaDisplay";
 import { rangoFechas } from "@/data/exposiciones";
-import { EstadoExposicionBadge } from "@/components/EstadoExposicionBadge";
 
 export function Exposiciones() {
   const { exposiciones, artistaPorId, loading } = useContent();
@@ -24,15 +23,12 @@ export function Exposiciones() {
             href={`/exposiciones/${expo.id}`}
             className="group text-left"
           >
-            <div className="relative">
-              <MediaDisplay
-                src={expo.media[0]?.url}
-                tipo={expo.media[0]?.tipo}
-                alt={expo.media[0]?.descripcion || expo.titulo}
-                className="aspect-[4/3] rounded-sm"
-              />
-              <EstadoExposicionBadge expo={expo} className="absolute left-3 top-3" />
-            </div>
+            <MediaDisplay
+              src={expo.media[0]?.url}
+              tipo={expo.media[0]?.tipo}
+              alt={expo.media[0]?.descripcion || expo.titulo}
+              className="aspect-[4/3] rounded-sm"
+            />
             <h3 className="mt-4 text-lg text-neutral-900 transition-colors group-hover:text-[#c2185b]">
               {expo.titulo}
             </h3>

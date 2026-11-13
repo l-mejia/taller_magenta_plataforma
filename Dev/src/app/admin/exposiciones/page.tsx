@@ -5,7 +5,6 @@ import { AdminGuard } from "@/components/admin/AdminGuard";
 import { useContent } from "@/context/ContentContext";
 import { MediaDisplay } from "@/components/MediaDisplay";
 import { rangoFechas } from "@/data/exposiciones";
-import { EstadoExposicionBadge } from "@/components/EstadoExposicionBadge";
 
 function ExposicionesAdmin() {
   const { exposiciones, deleteExposicion, loading, artistaPorId } = useContent();
@@ -50,7 +49,6 @@ function ExposicionesAdmin() {
             <div className="min-w-0 flex-1">
               <p className="text-neutral-900">
                 {expo.titulo}
-                <EstadoExposicionBadge expo={expo} className="ml-2" />
                 {!expo.publicado && (
                   <span className="ml-2 border border-[#c2185b] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#c2185b]">
                     Borrador

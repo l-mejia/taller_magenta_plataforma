@@ -1,5 +1,5 @@
 import { contacto } from "@/data/contacto";
-import { MailIcon, MapPinIcon, PhoneIcon, InstagramIcon } from "@/components/icons";
+import { ClockIcon, MailIcon, MapPinIcon, PhoneIcon, InstagramIcon } from "@/components/icons";
 
 export function Contacto() {
   return (
@@ -47,8 +47,12 @@ export function Contacto() {
             rel="noopener noreferrer"
             className="text-neutral-700 hover:text-[#c2185b]"
           >
-            Barranco, Lima — ver en Google Maps
+            {contacto.direccion} — ver en Google Maps
           </a>
+        </li>
+        <li className="flex items-center gap-4">
+          <ClockIcon className="h-5 w-5 shrink-0 text-[#c2185b]" />
+          <span className="text-neutral-700">{contacto.horario}</span>
         </li>
       </ul>
     </main>

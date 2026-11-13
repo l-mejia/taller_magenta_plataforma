@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useContent } from "@/context/ContentContext";
 import { MediaDisplay } from "@/components/MediaDisplay";
 import { rangoFechas } from "@/data/exposiciones";
-import { EstadoExposicionBadge } from "@/components/EstadoExposicionBadge";
 import { PieDeFoto } from "@/components/PieDeFoto";
 import { FichaArtista } from "@/components/FichaArtista";
 import type { Artista } from "@/data/artistas";
@@ -65,10 +64,7 @@ export default function ExposicionPage() {
         <p className="mt-2 text-neutral-700">{artistas.map((a) => a.nombre).join(", ")}</p>
       )}
       {rangoFechas(expo) && (
-        <p className="mt-2 flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
-          <EstadoExposicionBadge expo={expo} />
-          {rangoFechas(expo)}
-        </p>
+        <p className="mt-1 text-xs uppercase tracking-wide text-neutral-400">{rangoFechas(expo)}</p>
       )}
 
       <p className="mt-8 whitespace-pre-line leading-relaxed text-neutral-600">

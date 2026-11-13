@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { artistas as artistasSeed, type Artista } from "@/data/artistas";
-import { exposiciones as exposicionesSeed, type Exposicion } from "@/data/exposiciones";
+import { exposiciones as exposicionesSeed, ordenarPorFecha as ordenarExposiciones, type Exposicion } from "@/data/exposiciones";
 import { tienda as tiendaSeed, type ItemTienda } from "@/data/tienda";
 import { revista as revistaSeed, type Publicacion } from "@/data/revista";
 import type { MediaItem } from "@/data/media";
@@ -271,7 +271,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
           .order("created_at", { ascending: false }),
       ]);
       setArtistas((check(arts) ?? []).map((r) => rowToArtista(r as ArtistaRow)));
-      setExposiciones((check(expos) ?? []).map((r) => rowToExposicion(r as ExposicionRow)));
+      setExposiciones(ordenarExposiciones((check(expos) ?? []).map((r) => rowToExposicion(r as ExposicionRow))));
       setTiendaRaw((check(items) ?? []).map((r) => rowToItem(r as ItemTiendaRow)));
       setRevista((check(pubs) ?? []).map((r) => rowToPublicacion(r as PublicacionRow)));
       setError(null);
@@ -369,7 +369,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     };
     check(await requireSupabase().from("exposiciones").insert(exposicionToRow(nueva)));
     await guardarArtistasDeExposicion(nueva.id, nueva.artistaIds);
-    setExposiciones((prev) => [nueva, ...prev]);
+    setExposiciones((prev) => ordenarExposiciones([nueva, ...prev]));
     return nueva;
   }
 
@@ -380,7 +380,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       await requireSupabase().from("exposiciones").update(exposicionToRow(actualizada)).eq("id", id),
     );
     await guardarArtistasDeExposicion(id, data.artistaIds);
-    setExposiciones((prev) => prev.map((e) => (e.id === id ? actualizada : e)));
+    setExposiciones((prev) => ordenarExposiciones(prev.map((e) => (e.id === id ? actualizada : e))));
     if (anterior) await borrarMedia(mediaQuitada(anterior.media, data.media));
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { estadoExposicion, etiquetaEstado, type Exposicion } from "@/data/exposiciones";
+import type { Exposicion } from "@/data/exposiciones";
 import { ArtistaPicker } from "@/components/admin/ArtistaPicker";
 import { MediaGalleryField } from "@/components/admin/MediaGalleryField";
 
@@ -118,13 +118,6 @@ export function ExposicionForm({
             </p>
           </div>
         </div>
-        {estadoExposicion(data) && (
-          <p className="text-xs text-neutral-500">
-            Con estas fechas, hoy la exposición figura como{" "}
-            <strong className="text-neutral-800">{etiquetaEstado[estadoExposicion(data)!]}</strong>.
-            {!data.fechaFin && estadoExposicion(data) === "abierta" && " Seguirá abierta hasta que pongas la fecha de término."}
-          </p>
-        )}
 
         <div>
           <label className="block text-sm text-neutral-600" htmlFor="expo-descripcion">
