@@ -12,6 +12,7 @@ import {
 import { artistas as artistasSeed, type Artista } from "@/data/artistas";
 import { exposiciones as exposicionesSeed, type Exposicion } from "@/data/exposiciones";
 import { tienda as tiendaSeed, type ItemTienda } from "@/data/tienda";
+import { revista as revistaSeed, type Publicacion } from "@/data/revista";
 import type { MediaItem } from "@/data/media";
 import { formatMonto, parsePrecio } from "@/context/CartContext";
 import { useAdminAuth } from "@/context/AdminAuthContext";
@@ -57,6 +58,50 @@ interface ItemTiendaRow {
   stock: number;
   visible: boolean;
   media: MediaItem[];
+}
+
+interface PublicacionRow {
+  id: string;
+  tipo: Publicacion["tipo"];
+  titulo: string;
+  resumen: string;
+  cuerpo: string;
+  autor: string;
+  fecha: string;
+  publicado: boolean;
+  media: MediaItem[];
+  revista_artistas?: { artista_id: string; orden: number }[];
+}
+
+function rowToPublicacion(row: PublicacionRow): Publicacion {
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    titulo: row.titulo,
+    resumen: row.resumen,
+    cuerpo: row.cuerpo,
+    autor: row.autor,
+    fecha: row.fecha,
+    publicado: row.publicado,
+    media: row.media ?? [],
+    artistaIds: [...(row.revista_artistas ?? [])]
+      .sort((a, b) => a.orden - b.orden)
+      .map((r) => r.artista_id),
+  };
+}
+
+function publicacionToRow(p: Publicacion): Omit<PublicacionRow, "revista_artistas"> {
+  return {
+    id: p.id,
+    tipo: p.tipo,
+    titulo: p.titulo,
+    resumen: p.resumen,
+    cuerpo: p.cuerpo,
+    autor: p.autor,
+    fecha: p.fecha,
+    publicado: p.publicado,
+    media: p.media,
+  };
 }
 
 function rowToArtista(row: ArtistaRow): Artista {
@@ -164,17 +209,21 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 }
 
 const SELECT_EXPOSICIONES = "*, exposicion_artistas(artista_id, orden)";
+const SELECT_REVISTA = "*, revista_artistas(artista_id, orden)";
 
 // --- Contexto ---------------------------------------------------------------
 
 type DatosExposicion = Omit<Exposicion, "id">;
 type DatosItem = Omit<ItemTienda, "id">;
 type DatosArtista = Omit<Artista, "id">;
+type DatosPublicacion = Omit<Publicacion, "id">;
 
 interface ContentContextValue {
   artistas: Artista[];
   exposiciones: Exposicion[];
   tienda: ItemTienda[];
+  /** Ordenada de la más reciente a la más antigua. */
+  revista: Publicacion[];
   loading: boolean;
   error: string | null;
   recargar: () => Promise<void>;
@@ -188,6 +237,9 @@ interface ContentContextValue {
   addItemTienda: (data: DatosItem) => Promise<ItemTienda>;
   updateItemTienda: (id: string, data: DatosItem) => Promise<void>;
   deleteItemTienda: (id: string) => Promise<void>;
+  addPublicacion: (data: DatosPublicacion) => Promise<Publicacion>;
+  updatePublicacion: (id: string, data: DatosPublicacion) => Promise<void>;
+  deletePublicacion: (id: string) => Promise<void>;
   cargarContenidoDeEjemplo: () => Promise<void>;
 }
 
@@ -198,23 +250,30 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const [artistas, setArtistas] = useState<Artista[]>([]);
   const [exposiciones, setExposiciones] = useState<Exposicion[]>([]);
   const [tiendaRaw, setTiendaRaw] = useState<ItemTienda[]>([]);
+  const [revista, setRevista] = useState<Publicacion[]>([]);
   const [loading, setLoading] = useState(supabase !== null);
   const [error, setError] = useState<string | null>(supabase ? null : SUPABASE_NO_CONFIGURADO);
 
   const recargar = useCallback(async () => {
     if (!supabase) return;
     try {
-      const [arts, expos, items] = await Promise.all([
+      const [arts, expos, items, pubs] = await Promise.all([
         supabase.from("artistas").select("*").order("nombre"),
         supabase
           .from("exposiciones")
           .select(SELECT_EXPOSICIONES)
           .order("created_at", { ascending: false }),
         supabase.from("items_tienda").select("*").order("created_at", { ascending: false }),
+        supabase
+          .from("revista")
+          .select(SELECT_REVISTA)
+          .order("fecha", { ascending: false })
+          .order("created_at", { ascending: false }),
       ]);
       setArtistas((check(arts) ?? []).map((r) => rowToArtista(r as ArtistaRow)));
       setExposiciones((check(expos) ?? []).map((r) => rowToExposicion(r as ExposicionRow)));
       setTiendaRaw((check(items) ?? []).map((r) => rowToItem(r as ItemTiendaRow)));
+      setRevista((check(pubs) ?? []).map((r) => rowToPublicacion(r as PublicacionRow)));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el contenido.");
@@ -284,6 +343,9 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       prev.map((e) => ({ ...e, artistaIds: e.artistaIds.filter((a) => a !== id) })),
     );
     setTiendaRaw((prev) => prev.map((i) => (i.artistaId === id ? { ...i, artistaId: null } : i)));
+    setRevista((prev) =>
+      prev.map((p) => ({ ...p, artistaIds: p.artistaIds.filter((a) => a !== id) })),
+    );
     if (anterior) await borrarMedia(fotoComoMedia(anterior.fotoUrl));
   }
 
@@ -366,6 +428,47 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     if (anterior) await borrarMedia(anterior.media);
   }
 
+  // --- Revista ---
+
+  async function guardarArtistasDePublicacion(revistaId: string, artistaIds: string[]) {
+    const db = requireSupabase();
+    check(await db.from("revista_artistas").delete().eq("revista_id", revistaId));
+    if (artistaIds.length === 0) return;
+    check(
+      await db.from("revista_artistas").insert(
+        artistaIds.map((artista_id, orden) => ({ revista_id: revistaId, artista_id, orden })),
+      ),
+    );
+  }
+
+  function ordenarPorFecha(lista: Publicacion[]): Publicacion[] {
+    return [...lista].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }
+
+  async function addPublicacion(data: DatosPublicacion) {
+    const nueva: Publicacion = { ...data, id: generateId(data.titulo, revista.map((p) => p.id)) };
+    check(await requireSupabase().from("revista").insert(publicacionToRow(nueva)));
+    await guardarArtistasDePublicacion(nueva.id, nueva.artistaIds);
+    setRevista((prev) => ordenarPorFecha([nueva, ...prev]));
+    return nueva;
+  }
+
+  async function updatePublicacion(id: string, data: DatosPublicacion) {
+    const anterior = revista.find((p) => p.id === id);
+    const actualizada: Publicacion = { ...data, id };
+    check(await requireSupabase().from("revista").update(publicacionToRow(actualizada)).eq("id", id));
+    await guardarArtistasDePublicacion(id, data.artistaIds);
+    setRevista((prev) => ordenarPorFecha(prev.map((p) => (p.id === id ? actualizada : p))));
+    if (anterior) await borrarMedia(mediaQuitada(anterior.media, data.media));
+  }
+
+  async function deletePublicacion(id: string) {
+    const anterior = revista.find((p) => p.id === id);
+    check(await requireSupabase().from("revista").delete().eq("id", id));
+    setRevista((prev) => prev.filter((p) => p.id !== id));
+    if (anterior) await borrarMedia(anterior.media);
+  }
+
   /** Reemplaza todo el contenido por el de ejemplo de src/data (para pruebas internas). */
   async function cargarContenidoDeEjemplo() {
     const db = requireSupabase();
@@ -374,12 +477,14 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     const conFecha = <T,>(rows: T[]) =>
       rows.map((r, i) => ({ ...r, created_at: new Date(ahora - i * 1000).toISOString() }));
 
+    check(await db.from("revista").delete().neq("id", ""));
     check(await db.from("exposiciones").delete().neq("id", ""));
     check(await db.from("items_tienda").delete().neq("id", ""));
     check(await db.from("artistas").delete().neq("id", ""));
     await borrarMedia([
       ...exposiciones.flatMap((e) => e.media),
       ...tiendaRaw.flatMap((i) => i.media),
+      ...revista.flatMap((p) => p.media),
       ...artistas.flatMap((a) => fotoComoMedia(a.fotoUrl)),
     ]);
 
@@ -393,6 +498,14 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       ),
     );
     check(await db.from("items_tienda").insert(conFecha(tiendaSeed.map(itemToRow))));
+    check(await db.from("revista").insert(revistaSeed.map(publicacionToRow)));
+    check(
+      await db.from("revista_artistas").insert(
+        revistaSeed.flatMap((p) =>
+          p.artistaIds.map((artista_id, orden) => ({ revista_id: p.id, artista_id, orden })),
+        ),
+      ),
+    );
     await recargar();
   }
 
@@ -401,6 +514,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       artistas,
       exposiciones,
       tienda,
+      revista,
       loading,
       error,
       recargar,
@@ -414,10 +528,13 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       addItemTienda,
       updateItemTienda,
       deleteItemTienda,
+      addPublicacion,
+      updatePublicacion,
+      deletePublicacion,
       cargarContenidoDeEjemplo,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- las funciones se redefinen cada render pero solo dependen del estado listado
-    [artistas, exposiciones, tienda, tiendaRaw, artistasPorId, loading, error, recargar],
+    [artistas, exposiciones, tienda, tiendaRaw, revista, artistasPorId, loading, error, recargar],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

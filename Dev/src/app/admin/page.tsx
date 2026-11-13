@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { useContent } from "@/context/ContentContext";
@@ -18,23 +17,11 @@ function Tarjeta({ href, titulo, detalle }: { href: string; titulo: string; deta
 }
 
 function AdminHome() {
-  const { artistas, exposiciones, tienda, cargarContenidoDeEjemplo, error } = useContent();
-  const [cargando, setCargando] = useState(false);
+  const { artistas, exposiciones, tienda, revista, error } = useContent();
 
   const borradores = exposiciones.filter((e) => !e.publicado).length;
   const ocultos = tienda.filter((t) => !t.visible).length;
-
-  async function handleCargarEjemplo() {
-    if (!window.confirm("¿Reemplazar TODO el contenido por el de ejemplo? Se borrarán los artistas, exposiciones, productos y fotos actuales.")) return;
-    setCargando(true);
-    try {
-      await cargarContenidoDeEjemplo();
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "No se pudo cargar el contenido de ejemplo.");
-    } finally {
-      setCargando(false);
-    }
-  }
+  const borradoresRevista = revista.filter((p) => !p.publicado).length;
 
   return (
     <main className="mx-auto max-w-3xl px-6 pb-28 pt-32">
@@ -47,7 +34,7 @@ function AdminHome() {
 
       {error && <p className="mt-4 text-sm text-[#c2185b]">{error}</p>}
 
-      <div className="mt-10 grid gap-6 sm:grid-cols-3">
+      <div className="mt-10 grid gap-6 sm:grid-cols-2">
         <Tarjeta
           href="/admin/exposiciones"
           titulo="Exposiciones"
@@ -59,22 +46,17 @@ function AdminHome() {
           detalle={`${tienda.length} productos${ocultos ? ` · ${ocultos} ocultos` : ""}`}
         />
         <Tarjeta
+          href="/admin/revista"
+          titulo="Revista"
+          detalle={`${revista.length} publicaciones${borradoresRevista ? ` · ${borradoresRevista} en borrador` : ""}`}
+        />
+        <Tarjeta
           href="/admin/artistas"
           titulo="Artistas"
           detalle={`${artistas.length} en el catálogo`}
         />
       </div>
 
-      <div className="mt-12 border-t border-black/5 pt-6">
-        <button
-          type="button"
-          onClick={handleCargarEjemplo}
-          disabled={cargando}
-          className="text-xs text-neutral-400 hover:text-[#c2185b] disabled:opacity-50"
-        >
-          {cargando ? "Cargando contenido de ejemplo…" : "Cargar contenido de ejemplo"}
-        </button>
-      </div>
     </main>
   );
 }

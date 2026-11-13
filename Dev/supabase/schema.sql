@@ -199,6 +199,62 @@ drop policy if exists "tienda: lectura publica" on public.items_tienda;
 create policy "tienda: lectura publica" on public.items_tienda
   for select to anon, authenticated using (visible or public.is_admin());
 
+-- ===========================================================================
+-- Revista (v3): artículos, noticias y entrevistas
+-- ===========================================================================
+
+create table if not exists public.revista (
+  id text primary key,
+  tipo text not null check (tipo in ('articulo', 'noticia', 'entrevista')),
+  titulo text not null,
+  -- bajada: una o dos líneas que resumen la publicación
+  resumen text not null default '',
+  -- texto completo; los párrafos se separan con una línea en blanco
+  cuerpo text not null default '',
+  -- firma: quién escribe ("Por ...")
+  autor text not null default '',
+  fecha date not null default current_date,
+  media jsonb not null default '[]'::jsonb,
+  publicado boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists revista_fecha_idx on public.revista (fecha desc);
+
+drop trigger if exists revista_updated_at on public.revista;
+create trigger revista_updated_at before update on public.revista
+  for each row execute function public.touch_updated_at();
+
+-- Artistas mencionados / entrevistados
+create table if not exists public.revista_artistas (
+  revista_id text not null references public.revista (id) on delete cascade on update cascade,
+  artista_id text not null references public.artistas (id) on delete cascade on update cascade,
+  orden integer not null default 0,
+  primary key (revista_id, artista_id)
+);
+
+alter table public.revista enable row level security;
+alter table public.revista_artistas enable row level security;
+
+drop policy if exists "revista: lectura publica" on public.revista;
+create policy "revista: lectura publica" on public.revista
+  for select to anon, authenticated using (publicado or public.is_admin());
+
+drop policy if exists "revista: admins escriben" on public.revista;
+create policy "revista: admins escriben" on public.revista
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "revista_artistas: lectura publica" on public.revista_artistas;
+create policy "revista_artistas: lectura publica" on public.revista_artistas
+  for select to anon, authenticated using (true);
+
+drop policy if exists "revista_artistas: admins escriben" on public.revista_artistas;
+create policy "revista_artistas: admins escriben" on public.revista_artistas
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 -- ---------------------------------------------------------------------------
 -- Dar permisos de admin (correr DESPUÉS de crear el usuario en
 -- Authentication → Users → Add user):

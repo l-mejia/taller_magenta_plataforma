@@ -5,69 +5,10 @@ import { useParams } from "next/navigation";
 import { useContent } from "@/context/ContentContext";
 import { MediaDisplay } from "@/components/MediaDisplay";
 import { rangoFechas } from "@/data/exposiciones";
-import { tieneFicha, type MediaItem } from "@/data/media";
+import { EstadoExposicionBadge } from "@/components/EstadoExposicionBadge";
+import { PieDeFoto } from "@/components/PieDeFoto";
+import { FichaArtista } from "@/components/FichaArtista";
 import type { Artista } from "@/data/artistas";
-
-function PieDeFoto({ item }: { item: MediaItem }) {
-  const { artistaPorId } = useContent();
-  const obra = tieneFicha(item.obra) ? item.obra : null;
-  if (!item.descripcion && !obra) return null;
-
-  const artista = obra?.artistaId ? artistaPorId(obra.artistaId)?.nombre : undefined;
-  const detalles = [obra?.tecnica, obra?.medidas, obra?.ano].filter(Boolean).join(" · ");
-
-  return (
-    <figcaption className="mt-3 space-y-1 text-sm">
-      {obra && (obra.titulo || artista) && (
-        <p className="text-neutral-900">
-          {artista && <span>{artista}</span>}
-          {artista && obra.titulo && <span className="text-neutral-400"> — </span>}
-          {obra.titulo && <em>{obra.titulo}</em>}
-        </p>
-      )}
-      {detalles && <p className="text-neutral-500">{detalles}</p>}
-      {item.descripcion && (
-        <p className="whitespace-pre-line text-neutral-600">{item.descripcion}</p>
-      )}
-    </figcaption>
-  );
-}
-
-function FichaArtista({ artista }: { artista: Artista }) {
-  return (
-    <div className="flex gap-5">
-      <MediaDisplay
-        src={artista.fotoUrl ?? undefined}
-        alt={artista.nombre}
-        className="h-20 w-20 shrink-0 rounded-full"
-      />
-      <div>
-        <h3 className="text-neutral-900">{artista.nombre}</h3>
-        {(artista.region || artista.instagram) && (
-          <p className="mt-0.5 text-xs text-neutral-400">
-            {artista.region}
-            {artista.region && artista.instagram && " · "}
-            {artista.instagram && (
-              <a
-                href={`https://instagram.com/${artista.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[#c2185b]"
-              >
-                @{artista.instagram}
-              </a>
-            )}
-          </p>
-        )}
-        {artista.bio && (
-          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-neutral-600">
-            {artista.bio}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export default function ExposicionPage() {
   const { id } = useParams<{ id: string }>();
@@ -124,7 +65,10 @@ export default function ExposicionPage() {
         <p className="mt-2 text-neutral-700">{artistas.map((a) => a.nombre).join(", ")}</p>
       )}
       {rangoFechas(expo) && (
-        <p className="mt-1 text-xs uppercase tracking-wide text-neutral-400">{rangoFechas(expo)}</p>
+        <p className="mt-2 flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
+          <EstadoExposicionBadge expo={expo} />
+          {rangoFechas(expo)}
+        </p>
       )}
 
       <p className="mt-8 whitespace-pre-line leading-relaxed text-neutral-600">

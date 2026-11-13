@@ -61,6 +61,28 @@ Esquema completo e idempotente: [`Dev/supabase/schema.sql`](../Dev/supabase/sche
 | `visible` | boolean | `false` = oculto en la tienda sin borrarlo |
 | `media` | jsonb | igual que en exposiciones |
 
+## `revista` — artículos, noticias y entrevistas
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | text, PK | slug, se usa en la URL: `/revista/<id>` |
+| `tipo` | text | `articulo`, `noticia` o `entrevista` |
+| `titulo` | text | obligatorio |
+| `resumen` | text | bajada de una o dos líneas, para la lista |
+| `cuerpo` | text | texto completo; párrafos separados por una línea en blanco. En entrevistas, los párrafos que terminan en "?" se muestran como preguntas |
+| `autor` | text | firma ("Por …") |
+| `fecha` | date | la revista se ordena por esta fecha, más reciente primero |
+| `publicado` | boolean | `false` = borrador |
+| `media` | jsonb | igual que en exposiciones; la primera es la portada |
+
+## `revista_artistas` — artistas mencionados o entrevistados
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `revista_id` | text → `revista.id` | cascade al borrar |
+| `artista_id` | text → `artistas.id` | cascade al borrar |
+| `orden` | integer | |
+
 ## Formato de `media`
 
 ```json
@@ -76,7 +98,7 @@ Esquema completo e idempotente: [`Dev/supabase/schema.sql`](../Dev/supabase/sche
 ```
 
 - `tipo`: `"imagen"` o `"video"`. `descripcion` (pie de foto) y `obra` (ficha) son opcionales.
-- **Imágenes:** bucket `media`, carpetas `exposiciones/`, `tienda/` o `artistas/`. jpg, png, webp o gif; máx. 5 MB.
+- **Imágenes:** bucket `media`, carpetas `exposiciones/`, `tienda/`, `revista/` o `artistas/`. jpg, png, webp o gif; máx. 5 MB.
   La plataforma las reduce a 1600 px y JPEG ~0.8 antes de subir.
 - **Videos:** no se suben archivos; se guarda el link de YouTube o Vimeo.
 - Al quitar una foto o borrar contenido, la plataforma borra también el archivo del bucket.

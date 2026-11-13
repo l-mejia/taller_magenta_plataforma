@@ -68,3 +68,31 @@ export function rangoFechas(expo: Pick<Exposicion, "fechaInicio" | "fechaFin">):
   if (expo.fechaInicio) return `Desde el ${fmt(expo.fechaInicio)}`;
   return "";
 }
+
+export type EstadoExposicion = "abierta" | "proxima" | "finalizada";
+
+export const etiquetaEstado: Record<EstadoExposicion, string> = {
+  abierta: "Abierta",
+  proxima: "Próximamente",
+  finalizada: "Finalizada",
+};
+
+/** Fecha de hoy en Lima como "YYYY-MM-DD" (comparable como texto con las fechas ISO). */
+export function hoyEnLima(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
+}
+
+/**
+ * Abierta: ya empezó y todavía no llega la fecha de término (o no tiene término).
+ * Próximamente: la fecha de inicio es futura. Finalizada: ya pasó la de término.
+ * Sin fecha de inicio no se puede saber: devuelve null.
+ */
+export function estadoExposicion(
+  expo: Pick<Exposicion, "fechaInicio" | "fechaFin">,
+  hoy: string = hoyEnLima(),
+): EstadoExposicion | null {
+  if (!expo.fechaInicio) return null;
+  if (hoy < expo.fechaInicio) return "proxima";
+  if (expo.fechaFin && hoy > expo.fechaFin) return "finalizada";
+  return "abierta";
+}

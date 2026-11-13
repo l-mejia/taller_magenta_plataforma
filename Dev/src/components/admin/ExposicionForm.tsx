@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { Exposicion } from "@/data/exposiciones";
+import { estadoExposicion, etiquetaEstado, type Exposicion } from "@/data/exposiciones";
 import { ArtistaPicker } from "@/components/admin/ArtistaPicker";
 import { MediaGalleryField } from "@/components/admin/MediaGalleryField";
 
@@ -55,7 +55,7 @@ export function ExposicionForm({
       return;
     }
     if (data.fechaInicio && data.fechaFin && data.fechaFin < data.fechaInicio) {
-      setError("La fecha de cierre es anterior a la de inauguración.");
+      setError("La fecha de término es anterior a la de inicio.");
       return;
     }
     setGuardando(publicar ? "publicar" : "borrador");
@@ -92,7 +92,7 @@ export function ExposicionForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm text-neutral-600" htmlFor="expo-inicio">
-              Inauguración
+              Fecha de inicio
             </label>
             <input
               id="expo-inicio"
@@ -104,7 +104,7 @@ export function ExposicionForm({
           </div>
           <div>
             <label className="block text-sm text-neutral-600" htmlFor="expo-fin">
-              Cierre (opcional)
+              Fecha de término
             </label>
             <input
               id="expo-fin"
@@ -113,8 +113,18 @@ export function ExposicionForm({
               onChange={(e) => set("fechaFin", e.target.value || null)}
               className={inputCls}
             />
+            <p className="mt-1 text-xs text-neutral-400">
+              Puedes dejarla vacía y agregarla después.
+            </p>
           </div>
         </div>
+        {estadoExposicion(data) && (
+          <p className="text-xs text-neutral-500">
+            Con estas fechas, hoy la exposición figura como{" "}
+            <strong className="text-neutral-800">{etiquetaEstado[estadoExposicion(data)!]}</strong>.
+            {!data.fechaFin && estadoExposicion(data) === "abierta" && " Seguirá abierta hasta que pongas la fecha de término."}
+          </p>
+        )}
 
         <div>
           <label className="block text-sm text-neutral-600" htmlFor="expo-descripcion">

@@ -13,6 +13,7 @@ const links = [
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/exposiciones", label: "Exposiciones" },
   { href: "/tienda", label: "Tienda" },
+  { href: "/revista", label: "Revista" },
   { href: "/contacto", label: "Contacto" },
 ];
 
